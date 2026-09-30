@@ -3,6 +3,7 @@ import 'package:uaap_market/pages/auth/login_page.dart';
 import 'package:uaap_market/pages/customer/account_page/account_information_page.dart';
 import 'package:uaap_market/pages/customer/account_page/addresses_page.dart';
 import 'package:uaap_market/pages/customer/account_page/customer_orders_page.dart';
+import 'package:uaap_market/pages/seller/seller_home_page.dart';
 import 'package:uaap_market/services/auth_services.dart';
 
 class CustomerAccountPage extends StatefulWidget {
@@ -18,6 +19,7 @@ class _CustomerAccountPageState
   final AuthService authService = AuthService();
 
   String fullName = '';
+  String role = '';
 
   bool isLoading = true;
 
@@ -36,6 +38,8 @@ class _CustomerAccountPageState
         setState(() {
           fullName =
               profile['full_name'] ?? '';
+          role =
+              profile['role'] ?? '';
           isLoading = false;
         });
       } else {
@@ -191,6 +195,34 @@ class _CustomerAccountPageState
           ),
 
           const Divider(),
+
+          if (role == 'seller') ...[
+            ListTile(
+              leading: const Icon(
+                Icons.store_outlined,
+              ),
+              title: const Text(
+                'My Store',
+              ),
+              subtitle: const Text(
+                'Manage your UAAP merchandise',
+              ),
+              trailing: const Icon(
+                Icons.chevron_right,
+              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const SellerHomePage(),
+                  ),
+                );
+              },
+            ),
+
+            const Divider(),
+          ],
 
           ListTile(
             leading: const Icon(

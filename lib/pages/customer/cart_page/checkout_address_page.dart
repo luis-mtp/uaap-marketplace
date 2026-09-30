@@ -79,203 +79,188 @@ class _CheckoutAddressPageState
   }
 
   Future<void> showAddAddressDialog() async {
-    final labelController =
-        TextEditingController();
-
-    final addressController =
-        TextEditingController();
-
-    final cityController =
-        TextEditingController();
-
-    final provinceController =
-        TextEditingController();
-
-    final postalCodeController =
-        TextEditingController();
+    final labelController = TextEditingController();
+    final addressController = TextEditingController();
+    final cityController = TextEditingController();
+    final provinceController = TextEditingController();
+    final postalCodeController = TextEditingController();
 
     final formKey = GlobalKey<FormState>();
 
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            'Add New Address',
-          ),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: labelController,
-                    decoration:
-                        const InputDecoration(
-                      labelText: 'Label',
-                      hintText: 'Home',
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text(
+              'Add New Address',
+            ),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: labelController,
+                      decoration: const InputDecoration(
+                        labelText: 'Label',
+                        hintText: 'Home',
+                      ),
+                      validator: (value) {
+                        if (value == null ||
+                            value.trim().isEmpty) {
+                          return 'Enter an address label.';
+                        }
+
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null ||
-                          value.trim().isEmpty) {
-                        return 'Enter an address label.';
-                      }
 
-                      return null;
-                    },
-                  ),
+                    const SizedBox(height: 12),
 
-                  const SizedBox(height: 12),
+                    TextFormField(
+                      controller: addressController,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Address',
+                      ),
+                      validator: (value) {
+                        if (value == null ||
+                            value.trim().isEmpty) {
+                          return 'Enter your address.';
+                        }
 
-                  TextFormField(
-                    controller:
-                        addressController,
-                    decoration:
-                        const InputDecoration(
-                      labelText: 'Full Address',
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null ||
-                          value.trim().isEmpty) {
-                        return 'Enter your address.';
-                      }
 
-                      return null;
-                    },
-                  ),
+                    const SizedBox(height: 12),
 
-                  const SizedBox(height: 12),
+                    TextFormField(
+                      controller: cityController,
+                      decoration: const InputDecoration(
+                        labelText: 'City',
+                      ),
+                      validator: (value) {
+                        if (value == null ||
+                            value.trim().isEmpty) {
+                          return 'Enter your city.';
+                        }
 
-                  TextFormField(
-                    controller: cityController,
-                    decoration:
-                        const InputDecoration(
-                      labelText: 'City',
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null ||
-                          value.trim().isEmpty) {
-                        return 'Enter your city.';
-                      }
 
-                      return null;
-                    },
-                  ),
+                    const SizedBox(height: 12),
 
-                  const SizedBox(height: 12),
+                    TextFormField(
+                      controller: provinceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Province',
+                      ),
+                      validator: (value) {
+                        if (value == null ||
+                            value.trim().isEmpty) {
+                          return 'Enter your province.';
+                        }
 
-                  TextFormField(
-                    controller:
-                        provinceController,
-                    decoration:
-                        const InputDecoration(
-                      labelText: 'Province',
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null ||
-                          value.trim().isEmpty) {
-                        return 'Enter your province.';
-                      }
 
-                      return null;
-                    },
-                  ),
+                    const SizedBox(height: 12),
 
-                  const SizedBox(height: 12),
+                    TextFormField(
+                      controller: postalCodeController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Postal Code',
+                      ),
+                      validator: (value) {
+                        if (value == null ||
+                            value.trim().isEmpty) {
+                          return 'Enter your postal code.';
+                        }
 
-                  TextFormField(
-                    controller:
-                        postalCodeController,
-                    keyboardType:
-                        TextInputType.number,
-                    decoration:
-                        const InputDecoration(
-                      labelText: 'Postal Code',
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null ||
-                          value.trim().isEmpty) {
-                        return 'Enter your postal code.';
-                      }
-
-                      return null;
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(
-                  context,
-                  false,
-                );
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (!formKey.currentState!
-                    .validate()) {
-                  return;
-                }
-
-                try {
-                  await addressService
-                      .addAddress(
-                    label:
-                        labelController.text.trim(),
-                    fullAddress:
-                        addressController.text.trim(),
-                    city:
-                        cityController.text.trim(),
-                    province:
-                        provinceController.text
-                            .trim(),
-                    postalCode:
-                        postalCodeController.text
-                            .trim(),
-                    isDefault:
-                        addresses.isEmpty,
-                  );
-
-                  if (!context.mounted) return;
-
+            actions: [
+              TextButton(
+                onPressed: () {
                   Navigator.pop(
-                    context,
-                    true,
+                    dialogContext,
+                    false,
                   );
-                } catch (e) {
-                  if (!context.mounted) return;
+                },
+                child: const Text('Cancel'),
+              ),
 
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Failed to add address: $e',
+              ElevatedButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) {
+                    return;
+                  }
+
+                  try {
+                    await addressService.addAddress(
+                      label: labelController.text.trim(),
+                      fullAddress:
+                          addressController.text.trim(),
+                      city: cityController.text.trim(),
+                      province:
+                          provinceController.text.trim(),
+                      postalCode:
+                          postalCodeController.text.trim(),
+                      isDefault: addresses.isEmpty,
+                    );
+
+                    if (!dialogContext.mounted) {
+                      return;
+                    }
+
+                    Navigator.pop(
+                      dialogContext,
+                      true,
+                    );
+                  } catch (e) {
+                    if (!dialogContext.mounted) {
+                      return;
+                    }
+
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Failed to add address: $e',
+                        ),
                       ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
+                    );
+                  }
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
 
-    labelController.dispose();
-    addressController.dispose();
-    cityController.dispose();
-    provinceController.dispose();
-    postalCodeController.dispose();
-
-    if (result == true) {
-      await loadAddresses();
+      // The dialog is completely closed here.
+      // Now it is safe to refresh the checkout page.
+      if (result == true && mounted) {
+        await loadAddresses();
+      }
+    } finally {
+      labelController.dispose();
+      addressController.dispose();
+      cityController.dispose();
+      provinceController.dispose();
+      postalCodeController.dispose();
     }
   }
 
@@ -365,8 +350,9 @@ class _CheckoutAddressPageState
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed:
-                          showAddAddressDialog,
+                      onPressed: () async {
+                        await showAddAddressDialog();
+                      },
                       icon: const Icon(
                         Icons.add,
                       ),

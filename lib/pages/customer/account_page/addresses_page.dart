@@ -54,28 +54,23 @@ class _AddressesPageState
   Future<void> showAddressForm({
     Map<String, dynamic>? address,
   }) async {
-    final labelController =
-        TextEditingController(
+    final labelController = TextEditingController(
       text: address?['label'] ?? '',
     );
 
-    final fullAddressController =
-        TextEditingController(
+    final fullAddressController = TextEditingController(
       text: address?['full_address'] ?? '',
     );
 
-    final cityController =
-        TextEditingController(
+    final cityController = TextEditingController(
       text: address?['city'] ?? '',
     );
 
-    final provinceController =
-        TextEditingController(
+    final provinceController = TextEditingController(
       text: address?['province'] ?? '',
     );
 
-    final postalCodeController =
-        TextEditingController(
+    final postalCodeController = TextEditingController(
       text: address?['postal_code'] ?? '',
     );
 
@@ -84,246 +79,214 @@ class _AddressesPageState
 
     final isEditing = address != null;
 
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (
-            context,
-            setDialogState,
-          ) {
-            return AlertDialog(
-              title: Text(
-                isEditing
-                    ? 'Edit Address'
-                    : 'Add Address',
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller:
-                          labelController,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Label',
-                        hintText:
-                            'e.g. Home, School',
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    TextField(
-                      controller:
-                          fullAddressController,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Full Address',
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    TextField(
-                      controller:
-                          cityController,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'City',
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    TextField(
-                      controller:
-                          provinceController,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Province',
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    TextField(
-                      controller:
-                          postalCodeController,
-                      keyboardType:
-                          TextInputType.number,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Postal Code',
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    CheckboxListTile(
-                      contentPadding:
-                          EdgeInsets.zero,
-                      title: const Text(
-                        'Set as default address',
-                      ),
-                      value: isDefault,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          isDefault =
-                              value ?? false;
-                        });
-                      },
-                    ),
-                  ],
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (
+              dialogContext,
+              setDialogState,
+            ) {
+              return AlertDialog(
+                title: Text(
+                  isEditing
+                      ? 'Edit Address'
+                      : 'Add Address',
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child:
-                      const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (labelController
-                            .text
-                            .trim()
-                            .isEmpty ||
-                        fullAddressController
-                            .text
-                            .trim()
-                            .isEmpty ||
-                        cityController
-                            .text
-                            .trim()
-                            .isEmpty ||
-                        provinceController
-                            .text
-                            .trim()
-                            .isEmpty ||
-                        postalCodeController
-                            .text
-                            .trim()
-                            .isEmpty) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Please fill in all fields.',
-                          ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: labelController,
+                        decoration: const InputDecoration(
+                          labelText: 'Label',
+                          hintText: 'e.g. Home, School',
                         ),
-                      );
+                      ),
 
-                      return;
-                    }
+                      const SizedBox(height: 12),
 
-                    try {
-                      if (isEditing) {
-                        await addressService
-                            .updateAddress(
-                          addressId:
-                              address['id'],
-                          label:
-                              labelController
-                                  .text
-                                  .trim(),
-                          fullAddress:
-                              fullAddressController
-                                  .text
-                                  .trim(),
-                          city:
-                              cityController
-                                  .text
-                                  .trim(),
-                          province:
-                              provinceController
-                                  .text
-                                  .trim(),
-                          postalCode:
-                              postalCodeController
-                                  .text
-                                  .trim(),
-                          isDefault:
-                              isDefault,
-                        );
-                      } else {
-                        await addressService
-                            .addAddress(
-                          label:
-                              labelController
-                                  .text
-                                  .trim(),
-                          fullAddress:
-                              fullAddressController
-                                  .text
-                                  .trim(),
-                          city:
-                              cityController
-                                  .text
-                                  .trim(),
-                          province:
-                              provinceController
-                                  .text
-                                  .trim(),
-                          postalCode:
-                              postalCodeController
-                                  .text
-                                  .trim(),
-                          isDefault:
-                              isDefault,
-                        );
-                      }
-
-                      if (!context.mounted) {
-                        return;
-                      }
-
-                      Navigator.pop(context);
-
-                      await loadAddresses();
-                    } catch (e) {
-                      if (!context.mounted) {
-                        return;
-                      }
-
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Failed to save address: $e',
-                          ),
+                      TextField(
+                        controller: fullAddressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Full Address',
                         ),
-                      );
-                    }
-                  },
-                  child: Text(
-                    isEditing
-                        ? 'Save'
-                        : 'Add',
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: cityController,
+                        decoration: const InputDecoration(
+                          labelText: 'City',
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: provinceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Province',
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextField(
+                        controller: postalCodeController,
+                        keyboardType:
+                            TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Postal Code',
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Set as default address',
+                        ),
+                        value: isDefault,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            isDefault =
+                                value ?? false;
+                          });
+                        },
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            );
-          },
-        );
-      },
-    );
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(
+                        dialogContext,
+                        false,
+                      );
+                    },
+                    child: const Text('Cancel'),
+                  ),
 
-    labelController.dispose();
-    fullAddressController.dispose();
-    cityController.dispose();
-    provinceController.dispose();
-    postalCodeController.dispose();
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (labelController.text
+                              .trim()
+                              .isEmpty ||
+                          fullAddressController.text
+                              .trim()
+                              .isEmpty ||
+                          cityController.text
+                              .trim()
+                              .isEmpty ||
+                          provinceController.text
+                              .trim()
+                              .isEmpty ||
+                          postalCodeController.text
+                              .trim()
+                              .isEmpty) {
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please fill in all fields.',
+                            ),
+                          ),
+                        );
+
+                        return;
+                      }
+
+                      try {
+                        if (isEditing) {
+                          await addressService.updateAddress(
+                            addressId: address['id'],
+                            label:
+                                labelController.text.trim(),
+                            fullAddress:
+                                fullAddressController.text
+                                    .trim(),
+                            city:
+                                cityController.text.trim(),
+                            province:
+                                provinceController.text
+                                    .trim(),
+                            postalCode:
+                                postalCodeController.text
+                                    .trim(),
+                            isDefault: isDefault,
+                          );
+                        } else {
+                          await addressService.addAddress(
+                            label:
+                                labelController.text.trim(),
+                            fullAddress:
+                                fullAddressController.text
+                                    .trim(),
+                            city:
+                                cityController.text.trim(),
+                            province:
+                                provinceController.text
+                                    .trim(),
+                            postalCode:
+                                postalCodeController.text
+                                    .trim(),
+                            isDefault: isDefault,
+                          );
+                        }
+
+                        if (!dialogContext.mounted) {
+                          return;
+                        }
+
+                        Navigator.pop(
+                          dialogContext,
+                          true,
+                        );
+                      } catch (e) {
+                        if (!dialogContext.mounted) {
+                          return;
+                        }
+
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Failed to save address: $e',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: Text(
+                      isEditing ? 'Save' : 'Add',
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+      // The dialog has completely closed here.
+      if (result == true && mounted) {
+        await loadAddresses();
+      }
+    } finally {
+      labelController.dispose();
+      fullAddressController.dispose();
+      cityController.dispose();
+      provinceController.dispose();
+      postalCodeController.dispose();
+    }
   }
 
   Future<void> deleteAddress(
@@ -368,8 +331,8 @@ class _AddressesPageState
       ),
       floatingActionButton:
           FloatingActionButton(
-        onPressed: () {
-          showAddressForm();
+        onPressed: () async {
+          await showAddressForm();
         },
         child: const Icon(
           Icons.add,
@@ -484,10 +447,9 @@ class _AddressesPageState
                                         .end,
                                 children: [
                                   TextButton(
-                                    onPressed: () {
-                                      showAddressForm(
-                                        address:
-                                            address,
+                                    onPressed: () async {
+                                      await showAddressForm(
+                                        address: address,
                                       );
                                     },
                                     child:

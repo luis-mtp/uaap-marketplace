@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:uaap_market/services/admin_products_service.dart';
+import 'package:uaap_market/services/admin/admin_products_service.dart';
 
 class AdminEditProductPage extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -345,39 +345,22 @@ class _AdminEditProductPageState
       );
 
       if (isTopProduct) {
-        final variants =
-            widget.product[
-                    'product_variants']
-                as List<dynamic>? ??
-            [];
+        final sizeStocks = <String, int>{};
 
-        for (final variant in variants) {
-          final variantId =
-              variant['id']?.toString();
-
-          final size =
-              variant['size']?.toString();
-
-          if (variantId == null ||
-              size == null ||
-              !sizeControllers
-                  .containsKey(size)) {
-            continue;
-          }
-
-          final sizeStock =
-              int.parse(
-            sizeControllers[size]!
-                .text
-                .trim(),
-          );
-
-          await productService
-              .updateProductVariant(
-            variantId: variantId,
-            stock: sizeStock,
+        for (final size in sizeControllers.keys) {
+          sizeStocks[size] = int.parse(
+            sizeControllers[size]!.text.trim(),
           );
         }
+
+        await productService.syncProductVariants(
+          productId: productId,
+          sizeStocks: sizeStocks,
+        );
+      } else {
+        await productService.deleteProductVariants(
+          productId,
+        );
       }
 
       if (!mounted) return;

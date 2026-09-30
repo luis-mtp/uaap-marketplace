@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uaap_market/pages/admin/drawer/orders/admin_order_details_page.dart';
-import 'package:uaap_market/services/admin_service.dart';
+import 'package:uaap_market/services/admin/admin_service.dart';
 
 class AdminOrdersPage extends StatefulWidget {
   const AdminOrdersPage({super.key});
@@ -48,7 +48,6 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
         switch (status) {
           case 'pending':
           case 'confirmed':
-          case 'packed':
           case 'shipped':
             active.add(order);
             break;
@@ -122,8 +121,6 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
         return 'Pending';
       case 'confirmed':
         return 'Confirmed';
-      case 'packed':
-        return 'Packed';
       case 'shipped':
         return 'Shipped';
       case 'delivered':
@@ -145,10 +142,6 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
 
       case 'confirmed':
         icon = Icons.check_circle_outline;
-        break;
-
-      case 'packed':
-        icon = Icons.inventory_2_outlined;
         break;
 
       case 'shipped':
@@ -411,10 +404,6 @@ class _AdminOrdersPageState extends State<AdminOrdersPage> {
                   DropdownMenuItem(
                     value: 'confirmed',
                     child: Text('Confirmed'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'packed',
-                    child: Text('Packed'),
                   ),
                   DropdownMenuItem(
                     value: 'shipped',

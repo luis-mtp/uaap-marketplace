@@ -16,9 +16,6 @@ class OrderDetailsPage extends StatelessWidget {
       case 'confirmed':
         return 'Confirmed';
 
-      case 'packed':
-        return 'Packed';
-
       case 'shipped':
         return 'Shipped';
 

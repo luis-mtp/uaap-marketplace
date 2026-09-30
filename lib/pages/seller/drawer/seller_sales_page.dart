@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:uaap_market/services/admin/admin_service.dart';
+import 'package:uaap_market/services/seller/seller_service.dart';
 
-class AdminSalesPage extends StatefulWidget {
-  const AdminSalesPage({super.key});
+class SellerSalesPage extends StatefulWidget {
+  const SellerSalesPage({super.key});
 
   @override
-  State<AdminSalesPage> createState() => _AdminSalesPageState();
+  State<SellerSalesPage> createState() => _SellerSalesPageState();
 }
 
-class _AdminSalesPageState extends State<AdminSalesPage> {
-  final AdminService adminService = AdminService();
+class _SellerSalesPageState extends State<SellerSalesPage> {
+  final SellerService sellerService = SellerService();
 
   bool isLoading = true;
 
@@ -17,7 +17,6 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
   int totalOrders = 0;
   int completedOrders = 0;
   double averageOrderValue = 0;
-  int totalItemsSold = 0;
 
   int pendingOrders = 0;
   int confirmedOrders = 0;
@@ -25,67 +24,59 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
   int deliveredOrders = 0;
   int cancelledOrders = 0;
 
-  List<Map<String, dynamic>> salesByTeam = [];
-  List<Map<String, dynamic>> topSellingProducts = [];
+  List<Map<String, dynamic>> salesHistory = [];
 
   @override
   void initState() {
     super.initState();
-    loadSalesSummary();
+    loadSales();
   }
 
-  Future<void> loadSalesSummary() async {
+  Future<void> loadSales() async {
     try {
-      final summary =
-          await adminService.getSalesSummary();
-
-      final teamSales =
-          await adminService.getSalesByTeam();
-      
-      final productSales =
-          await adminService.getTopSellingProducts();
+      final sales = await sellerService.getSales();
 
       if (!mounted) return;
 
-      setState(() {
-        totalSales =
-            (summary['total_sales'] as num?)
-                    ?.toDouble() ??
-                0;
+      final history =
+          List<Map<String, dynamic>>.from(
+        sales['sales_history'] ?? [],
+      );
 
-        totalOrders =
-            summary['total_orders'] ?? 0;
+      final nonCancelledOrders =
+          (sales['total_orders'] as num?)?.toInt() ?? 0;
+
+      final totalSalesValue =
+          (sales['total_sales'] as num?)?.toDouble() ?? 0;
+
+      setState(() {
+        totalSales = totalSalesValue;
+
+        totalOrders = nonCancelledOrders;
 
         completedOrders =
-            summary['completed_orders'] ?? 0;
+            (sales['completed_orders'] as num?)?.toInt() ?? 0;
 
-        averageOrderValue =
-            (summary['average_order_value']
-                        as num?)
-                    ?.toDouble() ??
-                0;
-
-        totalItemsSold =
-            summary['total_items_sold'] ?? 0;
+        averageOrderValue = totalOrders > 0
+            ? totalSales / totalOrders
+            : 0;
 
         pendingOrders =
-            summary['pending_orders'] ?? 0;
+            (sales['pending_orders'] as num?)?.toInt() ?? 0;
 
         confirmedOrders =
-            summary['confirmed_orders'] ?? 0;
+            (sales['confirmed_orders'] as num?)?.toInt() ?? 0;
 
         shippedOrders =
-            summary['shipped_orders'] ?? 0;
+            (sales['shipped_orders'] as num?)?.toInt() ?? 0;
 
         deliveredOrders =
-            summary['delivered_orders'] ?? 0;
+            (sales['delivered_orders'] as num?)?.toInt() ?? 0;
 
         cancelledOrders =
-            summary['cancelled_orders'] ?? 0;
+            (sales['cancelled_orders'] as num?)?.toInt() ?? 0;
 
-        salesByTeam = teamSales;
-
-        topSellingProducts = productSales;
+        salesHistory = history;
 
         isLoading = false;
       });
@@ -105,7 +96,44 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
       );
     }
   }
-  
+
+  Widget _buildSummaryCard({
+    required String title,
+    required String value,
+    required IconData icon,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            Icon(
+              icon,
+              size: 28,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatusRow(
     String title,
     int count,
@@ -126,45 +154,67 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
     );
   }
 
-  Widget _buildTeamSalesRow(
-    String team,
-    double sales,
+  Widget _buildSalesHistoryRow(
+    Map<String, dynamic> sale,
   ) {
-    return Card(
-      child: ListTile(
-        leading: const Icon(
-          Icons.groups_outlined,
-        ),
-        title: Text(team),
-        trailing: Text(
-          '₱${sales.toStringAsFixed(2)}',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-      ),
-    );
-  }
+    final orderId = sale['id']?.toString() ?? '';
 
-  Widget _buildProductSalesRow(
-    String product,
-    int quantity,
-    double sales,
-  ) {
+    final shortOrderId = orderId.length > 8
+        ? orderId.substring(0, 8)
+        : orderId;
+
+    final customer =
+        sale['delivery_name']?.toString() ?? 'Customer';
+
+    final status =
+        sale['status']?.toString() ?? 'unknown';
+
+    final amount =
+        (sale['total_amount'] as num?)?.toDouble() ?? 0;
+
+    final createdAt =
+        sale['created_at']?.toString() ?? '';
+
+    DateTime? date;
+
+    try {
+      date = DateTime.parse(createdAt);
+    } catch (_) {
+      date = null;
+    }
+
+    final formattedDate = date == null
+        ? createdAt
+        : '${date.month}/${date.day}/${date.year}';
+
     return Card(
       child: ListTile(
         leading: const Icon(
-          Icons.shopping_bag_outlined,
+          Icons.receipt_long_outlined,
         ),
         title: Text(
-          product,
+          'Order #$shortOrderId',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        subtitle: Text(
-          '$quantity sold',
+        subtitle: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(customer),
+            Text(formattedDate),
+            Text(
+              status.toUpperCase(),
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
         trailing: Text(
-          '₱${sales.toStringAsFixed(2)}',
+          '₱${amount.toStringAsFixed(2)}',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -185,7 +235,7 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
               child: CircularProgressIndicator(),
             )
           : RefreshIndicator(
-              onRefresh: loadSalesSummary,
+              onRefresh: loadSales,
               child: SingleChildScrollView(
                 physics:
                     const AlwaysScrollableScrollPhysics(),
@@ -215,9 +265,7 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
                                 Icons.payments_outlined,
                           ),
                         ),
-
                         const SizedBox(width: 12),
-
                         Expanded(
                           child: _buildSummaryCard(
                             title: 'Total Orders',
@@ -238,23 +286,19 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
                           child: _buildSummaryCard(
                             title: 'Completed Orders',
                             value:
-                                completedOrders
-                                    .toString(),
+                                completedOrders.toString(),
                             icon:
                                 Icons.check_circle_outline,
                           ),
                         ),
-
                         const SizedBox(width: 12),
-
                         Expanded(
                           child: _buildSummaryCard(
-                            title: 'Items Sold',
+                            title: 'Delivered Sales',
                             value:
-                                totalItemsSold
-                                    .toString(),
+                                '₱${_getCompletedSales().toStringAsFixed(2)}',
                             icon:
-                                Icons.inventory_2_outlined,
+                                Icons.done_all,
                           ),
                         ),
                       ],
@@ -318,7 +362,7 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
                     const SizedBox(height: 24),
 
                     const Text(
-                      'Sales by UAAP Team',
+                      'Sales History',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -327,56 +371,24 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
 
                     const SizedBox(height: 12),
 
-                    if (salesByTeam.isEmpty)
+                    if (salesHistory.isEmpty)
                       SizedBox(
                         width: double.infinity,
                         child: Card(
                           child: Padding(
-                            padding: const EdgeInsets.all(16),
+                            padding:
+                                const EdgeInsets.all(16),
                             child: const Text(
-                              'No delivered sales yet.',
+                              'No sales yet.',
                             ),
                           ),
                         ),
                       )
                     else
-                      ...salesByTeam.map(
-                        (team) => _buildTeamSalesRow(
-                          team['team'].toString(),
-                          (team['sales'] as num).toDouble(),
-                        ),
-                      ),
-
-                    const SizedBox(height: 24),
-
-                    const Text(
-                      'Top-Selling Products',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    if (topSellingProducts.isEmpty)
-                      SizedBox(
-                        width: double.infinity,
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: const Text(
-                              'No delivered product sales yet.',
-                            ),
-                          ),
-                        ),
-                      )
-                    else
-                      ...topSellingProducts.map(
-                        (product) => _buildProductSalesRow(
-                          product['product'].toString(),
-                          (product['quantity'] as num).toInt(),
-                          (product['sales'] as num).toDouble(),
+                      ...salesHistory.map(
+                        (sale) =>
+                            _buildSalesHistoryRow(
+                          sale,
                         ),
                       ),
                   ],
@@ -386,44 +398,18 @@ class _AdminSalesPageState extends State<AdminSalesPage> {
     );
   }
 
-  Widget _buildSummaryCard({
-    required String title,
-    required String value,
-    required IconData icon,
-  }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            Icon(
-              icon,
-              size: 28,
-            ),
+  double _getCompletedSales() {
+    double total = 0;
 
-            const SizedBox(height: 12),
+    for (final sale in salesHistory) {
+      if (sale['status'] == 'delivered') {
+        total +=
+            (sale['total_amount'] as num?)
+                    ?.toDouble() ??
+                0;
+      }
+    }
 
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-              ),
-            ),
-
-            const SizedBox(height: 4),
-
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return total;
   }
 }

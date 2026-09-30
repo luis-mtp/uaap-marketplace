@@ -47,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
             builder: (_) => const AdminHomePage(),
           ),
         );
-      } else if (role == 'customer') {
+      } else if (role == 'customer' || role == 'seller') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(

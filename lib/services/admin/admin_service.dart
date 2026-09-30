@@ -3,13 +3,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AdminService {
   final SupabaseClient supabase = Supabase.instance.client;
 
+  // Fetches Dashboard Stats for Admin Home Page
   Future<Map<String, dynamic>> getDashboardStats() async {
-    // Get all orders
-    final orders = await supabase
-        .from('orders')
-        .select('id, status, total_amount');
+    final result = await supabase.rpc('get_admin_orders');
+
+    final orders =
+        List<Map<String, dynamic>>.from(result);
 
     double totalSales = 0;
+    int totalOrders = 0;
     int pendingOrders = 0;
     int completedOrders = 0;
 
@@ -21,6 +23,12 @@ class AdminService {
           (order['total_amount'] as num?)
                   ?.toDouble() ??
               0;
+
+      // Cancelled orders are not included
+      // in Total Orders.
+      if (status != 'cancelled') {
+        totalOrders++;
+      }
 
       if (status == 'delivered') {
         totalSales += amount;
@@ -34,7 +42,7 @@ class AdminService {
 
     return {
       'total_sales': totalSales,
-      'total_orders': orders.length,
+      'total_orders': totalOrders,
       'pending_orders': pendingOrders,
       'completed_orders': completedOrders,
     };
@@ -42,21 +50,22 @@ class AdminService {
 
   // Fetches Recent Orders
   Future<List<Map<String, dynamic>>> getRecentOrders() async {
-      final data = await supabase
-          .from('orders')
-          .select(
-            'id, status, total_amount, created_at',
-          )
-          .order(
-            'created_at',
-            ascending: false,
-          )
-          .limit(5);
+    final result = await supabase.rpc(
+      'get_admin_orders',
+    );
 
-      return List<Map<String, dynamic>>.from(
-        data,
-      );
-    }
+    final orders =
+        List<Map<String, dynamic>>.from(result);
+
+    return orders.take(5).map((order) {
+      return {
+        'id': order['id'],
+        'status': order['status'],
+        'total_amount': order['total_amount'],
+        'created_at': order['created_at'],
+      };
+    }).toList();
+  }
 
     // Gets Customer Stock and Product Statistics
     Future<Map<String, int>>
@@ -105,24 +114,9 @@ class AdminService {
 
   // Fetch Customers' Orders
   Future<List<Map<String, dynamic>>> getAllOrders() async {
-    final data = await supabase
-        .from('orders')
-        .select('''
-          id,
-          user_id,
-          delivery_name,
-          delivery_phone,
-          delivery_address,
-          delivery_city,
-          delivery_province,
-          delivery_postal_code,
-          status,
-          total_amount,
-          notes,
-          created_at,
-          updated_at
-        ''')
-        .order('created_at', ascending: false);
+    final data = await supabase.rpc(
+      'get_admin_orders',
+    );
 
     return List<Map<String, dynamic>>.from(data);
   }
@@ -176,25 +170,25 @@ class AdminService {
     required String orderId,
     required String status,
   }) async {
-    await supabase
-        .from('orders')
-        .update({
-          'status': status,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', orderId);
+    await supabase.rpc(
+      'set_admin_order_status',
+      params: {
+        'p_order_id': orderId,
+        'p_status': status,
+      },
+    );
   }
 
   // Fetch Customer Accounts
-  Future<List<Map<String, dynamic>>> getAllCustomers() async {
-    final data = await supabase
-        .rpc('get_admin_customers');
+  Future<List<Map<String, dynamic>>> getAllUsers() async {
+    final data =
+        await supabase.rpc('get_admin_customers');
 
     return List<Map<String, dynamic>>.from(data);
   }
 
   // Change Customer's Status
-  Future<void> setCustomerActiveStatus({
+  Future<void> setUserActiveStatus({
     required String userId,
     required bool isActive,
   }) async {
@@ -209,16 +203,19 @@ class AdminService {
 
   // Get Sales Summary
   Future<Map<String, dynamic>> getSalesSummary() async {
-    final orders = await supabase
-        .from('orders')
-        .select('id, status, total_amount');
+    final result = await supabase.rpc(
+      'get_admin_orders',
+    );
+
+    final orders =
+        List<Map<String, dynamic>>.from(result);
 
     double totalSales = 0;
+    int totalOrders = 0;
     int completedOrders = 0;
 
     int pendingOrders = 0;
     int confirmedOrders = 0;
-    int packedOrders = 0;
     int shippedOrders = 0;
     int deliveredOrders = 0;
     int cancelledOrders = 0;
@@ -232,6 +229,10 @@ class AdminService {
                   ?.toDouble() ??
               0;
 
+      if (status != 'cancelled') {
+        totalOrders++;
+      }
+
       switch (status) {
         case 'pending':
           pendingOrders++;
@@ -239,10 +240,6 @@ class AdminService {
 
         case 'confirmed':
           confirmedOrders++;
-          break;
-
-        case 'packed':
-          packedOrders++;
           break;
 
         case 'shipped':
@@ -270,27 +267,28 @@ class AdminService {
 
     final orderItems = await supabase
         .from('order_items')
-        .select('quantity, order_id');
+        .select('quantity');
 
     int totalItemsSold = 0;
 
     for (final item in orderItems) {
       final quantity =
-          (item['quantity'] as num?)?.toInt() ?? 0;
+          (item['quantity'] as num?)
+                  ?.toInt() ??
+              0;
 
       totalItemsSold += quantity;
     }
 
     return {
       'total_sales': totalSales,
-      'total_orders': orders.length,
+      'total_orders': totalOrders,
       'completed_orders': completedOrders,
       'average_order_value': averageOrderValue,
       'total_items_sold': totalItemsSold,
 
       'pending_orders': pendingOrders,
       'confirmed_orders': confirmedOrders,
-      'packed_orders': packedOrders,
       'shipped_orders': shippedOrders,
       'delivered_orders': deliveredOrders,
       'cancelled_orders': cancelledOrders,
@@ -299,148 +297,45 @@ class AdminService {
 
   // Get Sales by UAAP Team
   Future<List<Map<String, dynamic>>> getSalesByTeam() async {
-    final orderItems = await supabase
-        .from('order_items')
-        .select('''
-          quantity,
-          unit_price,
-          order_id,
-          orders (
-            status
-          ),
-          products (
-            team
-          )
-        ''');
-
-    final Map<String, double> teamSales = {};
-
-    for (final item in orderItems) {
-      final order = item['orders'];
-      final product = item['products'];
-
-      if (order == null || product == null) {
-        continue;
-      }
-
-      final status =
-          order['status']?.toString() ?? '';
-
-      // Only delivered orders count as sales
-      if (status != 'delivered') {
-        continue;
-      }
-
-      final team =
-          product['team']?.toString() ?? 'Unknown';
-
-      final quantity =
-          (item['quantity'] as num?)
-                  ?.toDouble() ??
-              0;
-
-      final unitPrice =
-          (item['unit_price'] as num?)
-                  ?.toDouble() ??
-              0;
-
-      final itemSales =
-          quantity * unitPrice;
-
-      teamSales[team] =
-          (teamSales[team] ?? 0) + itemSales;
-    }
-
-    final result = teamSales.entries.map((entry) {
-      return {
-        'team': entry.key,
-        'sales': entry.value,
-      };
-    }).toList();
-
-    result.sort(
-      (a, b) =>
-          (b['sales'] as double)
-              .compareTo(a['sales'] as double),
+    final result = await supabase.rpc(
+      'get_admin_sales_by_team',
     );
 
-    return result;
+    return List<Map<String, dynamic>>.from(result);
   }
 
   // Get Top-Selling Products
-Future<List<Map<String, dynamic>>> getTopSellingProducts() async {
-  final orderItems = await supabase
-      .from('order_items')
-      .select('''
-        quantity,
-        unit_price,
-        order_id,
-        orders (
-          status
-        ),
-        products (
-          name
-        )
-      ''');
+  Future<List<Map<String, dynamic>>> getTopSellingProducts() async {
+    final result = await supabase.rpc(
+      'get_admin_top_selling_products',
+    );
 
-  final Map<String, Map<String, dynamic>> productSales = {};
-
-  for (final item in orderItems) {
-    final order = item['orders'];
-    final product = item['products'];
-
-    if (order == null || product == null) {
-      continue;
-    }
-
-    final status =
-        order['status']?.toString() ?? '';
-
-    // Only delivered orders count as sales
-    if (status != 'delivered') {
-      continue;
-    }
-
-    final productName =
-        product['name']?.toString() ?? 'Unknown Product';
-
-    final quantity =
-        (item['quantity'] as num?)?.toInt() ?? 0;
-
-    final unitPrice =
-        (item['unit_price'] as num?)
-                ?.toDouble() ??
-            0;
-
-    final sales =
-        quantity * unitPrice;
-
-    if (!productSales.containsKey(productName)) {
-      productSales[productName] = {
-        'product': productName,
-        'quantity': 0,
-        'sales': 0.0,
-      };
-    }
-
-    productSales[productName]!['quantity'] =
-        (productSales[productName]!['quantity'] as int) +
-            quantity;
-
-    productSales[productName]!['sales'] =
-        (productSales[productName]!['sales'] as double) +
-            sales;
+    return List<Map<String, dynamic>>.from(result);
   }
 
-  final result =
-      productSales.values.toList();
+  // Fetch Seller Applications
+  Future<List<Map<String, dynamic>>> getSellerApplications() async {
+    final data =
+        await supabase.rpc(
+      'get_admin_seller_applications',
+    );
 
-  result.sort(
-    (a, b) =>
-        (b['quantity'] as int)
-            .compareTo(a['quantity'] as int),
-  );
+    return List<Map<String, dynamic>>.from(data);
+  }
 
-  return result;
-}
+  // Change Seller Application's Status
+  Future<void> setSellerApplicationStatus({
+    required String applicationId,
+    required String status,
+    String? adminReason,
+  }) async {
+    await supabase.rpc(
+      'set_seller_application_status',
+      params: {
+        'application_id': applicationId,
+        'new_status': status,
+        'new_admin_reason': adminReason,
+      },
+    );
+  }
 }

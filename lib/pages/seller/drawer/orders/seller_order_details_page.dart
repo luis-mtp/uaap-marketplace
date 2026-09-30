@@ -1,68 +1,91 @@
 import 'package:flutter/material.dart';
-import 'package:uaap_market/services/admin/admin_service.dart';
+import 'package:uaap_market/services/seller/seller_order_service.dart';
 
-class AdminOrderDetailsPage extends StatefulWidget {
+class SellerOrderDetailsPage extends StatefulWidget {
   final Map<String, dynamic> order;
 
-  const AdminOrderDetailsPage({
+  const SellerOrderDetailsPage({
     super.key,
     required this.order,
   });
 
   @override
-  State<AdminOrderDetailsPage> createState() => _AdminOrderDetailsPageState();
+  State<SellerOrderDetailsPage> createState() =>
+      _SellerOrderDetailsPageState();
 }
 
-class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
-
-  final AdminService adminService = AdminService();
-
-  List<Map<String, dynamic>> orderItems = [];
-  Map<String, dynamic>? payment;
+class _SellerOrderDetailsPageState
+    extends State<SellerOrderDetailsPage> {
   
+  final SellerOrderService sellerOrderService =
+    SellerOrderService();
+
   String? selectedStatus;
 
-  bool isLoading = true;
+  bool isUpdatingStatus = false;
+  bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
 
-    selectedStatus = widget.order['status']?.toString() ?? 'pending';
-
-    loadOrderDetails();
+    selectedStatus =
+        widget.order['status']?.toString() ?? 'pending';
   }
 
-  Future<void> loadOrderDetails() async {
-    try {
-      final items =
-          await adminService.getOrderItems(
-        widget.order['id'].toString(),
+  Future<void> updateStatus() async {
+    if (selectedStatus == null) return;
+
+    final currentStatus =
+        widget.order['status']?.toString() ?? 'pending';
+
+    if (selectedStatus == currentStatus) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No status change was made.',
+          ),
+        ),
       );
 
-      final paymentData =
-          await adminService.getOrderPayment(
-        widget.order['id'].toString(),
+      return;
+    }
+
+    setState(() {
+      isUpdatingStatus = true;
+    });
+
+    try {
+      await sellerOrderService.updateOrderStatus(
+        orderId: widget.order['id'].toString(),
+        status: selectedStatus!,
       );
 
       if (!mounted) return;
 
       setState(() {
-        orderItems = items;
-        payment = paymentData;
-        isLoading = false;
+        widget.order['status'] = selectedStatus;
+        isUpdatingStatus = false;
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Order status updated successfully.',
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        isLoading = false;
+        isUpdatingStatus = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to load order details: $e',
+            'Failed to update order status: $e',
           ),
         ),
       );
@@ -99,46 +122,39 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
     }
   }
 
-  Future<void> updateStatus() async {
-    if (selectedStatus == null) return;
+  String formatDate(String? date) {
+    if (date == null) return '';
 
-    try {
-      await adminService.updateOrderStatus(
-        orderId: widget.order['id'].toString(),
-        status: selectedStatus!,
-      );
+    final parsedDate = DateTime.tryParse(date);
 
-      if (!mounted) return;
+    if (parsedDate == null) return date;
 
-      setState(() {
-        widget.order['status'] = selectedStatus;
-      });
+    return '${parsedDate.month}/${parsedDate.day}/${parsedDate.year} '
+        '${parsedDate.hour.toString().padLeft(2, '0')}:'
+        '${parsedDate.minute.toString().padLeft(2, '0')}';
+  }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Order status updated successfully.',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
+  Future<void> refreshOrder() async {
+    // The order data is already loaded from SellerOrdersPage.
+    // This is kept so RefreshIndicator works like the Admin page.
+    setState(() {
+      isLoading = true;
+    });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to update order status: $e',
-          ),
-        ),
-      );
-    }
+    await Future.delayed(
+      const Duration(milliseconds: 300),
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
-
-    final bool isAdminOrder = order['seller_id'] == null;
 
     final orderId =
         order['id']?.toString() ?? '';
@@ -148,10 +164,22 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
             ? orderId.substring(0, 8)
             : orderId;
 
+    /* final status =
+        order['status']?.toString() ?? 'pending'; */
+
     final total =
         (order['total_amount'] as num?)
                 ?.toDouble() ??
             0;
+
+    final orderItems =
+        order['order_items']
+            as List<dynamic>? ??
+        [];
+
+    final payment =
+        order['payments']
+            as Map<String, dynamic>?;
 
     if (isLoading) {
       return Scaffold(
@@ -174,7 +202,7 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
       ),
 
       body: RefreshIndicator(
-        onRefresh: loadOrderDetails,
+        onRefresh: refreshOrder,
 
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -203,7 +231,7 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
                     const SizedBox(height: 12),
 
                     DropdownButtonFormField<String>(
-                      value: selectedStatus,
+                      initialValue: selectedStatus,
 
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
@@ -237,27 +265,14 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
                         ),
                       ],
 
-                      onChanged: isAdminOrder
-                          ? (value) {
+                      onChanged: isUpdatingStatus
+                          ? null
+                          : (value) {
                               setState(() {
                                 selectedStatus = value;
                               });
-                            }
-                          : null,
+                            },
                     ),
-
-                    if (!isAdminOrder)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: Text(
-                          'This order belongs to a seller. '
-                          'Only the assigned seller can update its status.',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
 
                     const SizedBox(height: 12),
 
@@ -265,16 +280,28 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
                       width: double.infinity,
 
                       child: ElevatedButton.icon(
-                        onPressed: isAdminOrder
-                            ? updateStatus
-                            : null,
+                        onPressed:
+                            isUpdatingStatus
+                                ? null
+                                : updateStatus,
 
-                        icon: const Icon(
-                          Icons.save_outlined,
-                        ),
+                        icon: isUpdatingStatus
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.save_outlined,
+                              ),
 
-                        label: const Text(
-                          'Update Status',
+                        label: Text(
+                          isUpdatingStatus
+                              ? 'Updating...'
+                              : 'Update Status',
                         ),
                       ),
                     ),
@@ -285,7 +312,7 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
 
             const SizedBox(height: 16),
 
-            // CUSTOMER INFORMATION
+            // CUSTOMER / DELIVERY INFORMATION
 
             const Text(
               'Customer / Delivery Information',
@@ -299,7 +326,8 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
 
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.all(16),
 
                 child: Column(
                   crossAxisAlignment:
@@ -365,7 +393,9 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
             if (orderItems.isEmpty)
               const Card(
                 child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding:
+                      EdgeInsets.all(16),
+
                   child: Text(
                     'No order items found.',
                   ),
@@ -374,14 +404,22 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
             else
               ...orderItems.map(
                 (item) {
+                  final product =
+                      item['products']
+                          as Map<String, dynamic>?;
+
+                  final variant =
+                      item['product_variants']
+                          as Map<String, dynamic>?;
+
                   final productName =
-                      item['products']?['name']
+                      product?['name']
                               ?.toString() ??
                           'Unknown Product';
 
                   final size =
-                      item['product_variants']?['size']
-                              ?.toString();
+                      variant?['size']
+                          ?.toString();
 
                   final quantity =
                       (item['quantity'] as num?)
@@ -397,14 +435,16 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
                       unitPrice * quantity;
 
                   return Card(
-                    margin: const EdgeInsets.only(
+                    margin:
+                        const EdgeInsets.only(
                       bottom: 8,
                     ),
 
                     child: ListTile(
                       title: Text(
                         productName,
-                        style: const TextStyle(
+                        style:
+                            const TextStyle(
                           fontWeight:
                               FontWeight.bold,
                         ),
@@ -413,6 +453,7 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
                       subtitle: Column(
                         crossAxisAlignment:
                             CrossAxisAlignment.start,
+
                         children: [
                           if (size != null)
                             Text(
@@ -431,7 +472,8 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
 
                       trailing: Text(
                         '₱${subtotal.toStringAsFixed(2)}',
-                        style: const TextStyle(
+                        style:
+                            const TextStyle(
                           fontWeight:
                               FontWeight.bold,
                         ),
@@ -457,7 +499,8 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
 
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.all(16),
 
                 child: payment == null
                     ? const Text(
@@ -470,7 +513,7 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
                         children: [
                           Text(
                             'Method: ${formatPaymentMethod(
-                              payment!['method']
+                              payment['method']
                                       ?.toString() ??
                                   '',
                             )}',
@@ -479,7 +522,7 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
                           const SizedBox(height: 6),
 
                           Text(
-                            'Status: ${payment!['status']
+                            'Status: ${payment['status']
                                     ?.toString()
                                     .toUpperCase() ?? ''}',
                           ),
@@ -494,11 +537,13 @@ class _AdminOrderDetailsPageState extends State<AdminOrderDetailsPage> {
 
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.all(16),
 
                 child: Row(
                   mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                      MainAxisAlignment
+                          .spaceBetween,
 
                   children: [
                     const Text(

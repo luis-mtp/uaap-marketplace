@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:uaap_market/pages/admin/admin_customers_page.dart';
+import 'package:uaap_market/pages/admin/admin_users_page.dart';
 import 'package:uaap_market/pages/admin/drawer/account/admin_account_page.dart';
+import 'package:uaap_market/pages/admin/drawer/admin_seller_applications_page.dart';
 import 'package:uaap_market/pages/admin/drawer/products/admin_deleted_products_page.dart';
 import 'package:uaap_market/pages/admin/drawer/orders/admin_orders_page.dart';
 import 'package:uaap_market/pages/admin/drawer/admin_products_page.dart';
 import 'package:uaap_market/pages/admin/drawer/sales/admin_sales_page.dart';
 import 'package:uaap_market/pages/auth/login_page.dart';
-import 'package:uaap_market/services/admin_service.dart';
+import 'package:uaap_market/services/admin/admin_service.dart';
 import 'package:uaap_market/services/auth_services.dart';
 //import 'package:uaap_market/pages/auth/login_page.dart';
 //import 'package:uaap_market/services/auth_services.dart';
@@ -232,6 +233,26 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 MaterialPageRoute(
                   builder: (context) =>
                       const AdminSalesPage(),
+                ),
+              );
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(
+              Icons.store_outlined,
+            ),
+            title: const Text(
+              'Seller Applications',
+            ),
+            onTap: () {
+              Navigator.pop(context);
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const AdminSellerApplicationsPage(),
                 ),
               );
             },
@@ -590,7 +611,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                         Icons.people_outline,
                       ),
                       title: const Text(
-                        'Customers',
+                        'Users',
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -612,7 +633,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                const AdminCustomersPage(),
+                                const AdminUsersPage(),
                           ),
                         );
 

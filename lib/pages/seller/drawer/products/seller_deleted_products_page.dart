@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:uaap_market/services/admin/admin_products_service.dart';
+import 'package:uaap_market/services/seller/seller_product_service.dart';
 
-class AdminDeletedProductsPage extends StatefulWidget {
-  const AdminDeletedProductsPage({super.key});
+class SellerDeletedProductsPage extends StatefulWidget {
+  const SellerDeletedProductsPage({super.key});
 
   @override
-  State<AdminDeletedProductsPage> createState() =>
-      _AdminDeletedProductsPageState();
+  State<SellerDeletedProductsPage> createState() =>
+      _SellerDeletedProductsPageState();
 }
 
-class _AdminDeletedProductsPageState
-    extends State<AdminDeletedProductsPage> {
-
-  final AdminProductService productService = AdminProductService();
+class _SellerDeletedProductsPageState
+    extends State<SellerDeletedProductsPage> {
+  final SellerProductService productService =
+      SellerProductService();
 
   List<Map<String, dynamic>> deletedProducts = [];
 
@@ -26,7 +26,8 @@ class _AdminDeletedProductsPageState
 
   Future<void> loadDeletedProducts() async {
     try {
-      final data = await productService.getDeletedProducts();
+      final data =
+          await productService.getMyDeletedProducts();
 
       if (!mounted) return;
 
@@ -75,7 +76,11 @@ class _AdminDeletedProductsPageState
           width: 80,
           height: 80,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
+          errorBuilder: (
+            context,
+            error,
+            stackTrace,
+          ) {
             return Container(
               width: 80,
               height: 80,
@@ -96,7 +101,11 @@ class _AdminDeletedProductsPageState
         width: 80,
         height: 80,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
+        errorBuilder: (
+          context,
+          error,
+          stackTrace,
+        ) {
           return Container(
             width: 80,
             height: 80,
@@ -119,7 +128,7 @@ class _AdminDeletedProductsPageState
 
     try {
       await productService.restoreProduct(
-        productId: productId,
+        productId,
       );
 
       if (!mounted) return;
@@ -154,7 +163,6 @@ class _AdminDeletedProductsPageState
           'Deleted Products',
         ),
       ),
-
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(),
@@ -203,7 +211,8 @@ class _AdminDeletedProductsPageState
                           bottom: 12,
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(12),
+                          padding:
+                              const EdgeInsets.all(12),
                           child: Row(
                             crossAxisAlignment:
                                 CrossAxisAlignment.start,
@@ -217,7 +226,8 @@ class _AdminDeletedProductsPageState
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                      CrossAxisAlignment
+                                          .start,
                                   children: [
                                     Text(
                                       name,
@@ -229,7 +239,9 @@ class _AdminDeletedProductsPageState
                                       ),
                                     ),
 
-                                    const SizedBox(height: 4),
+                                    const SizedBox(
+                                      height: 4,
+                                    ),
 
                                     Text(
                                       '$team • $category',
@@ -239,7 +251,9 @@ class _AdminDeletedProductsPageState
                                       ),
                                     ),
 
-                                    const SizedBox(height: 4),
+                                    const SizedBox(
+                                      height: 4,
+                                    ),
 
                                     Row(
                                       children: [
@@ -252,24 +266,32 @@ class _AdminDeletedProductsPageState
                                           ),
                                         ),
 
-                                        const SizedBox(width: 6),
+                                        const SizedBox(
+                                          width: 6,
+                                        ),
 
                                         const Text(
                                           'Deleted',
-                                          style: TextStyle(
+                                          style:
+                                              TextStyle(
                                             color: Colors.red,
                                             fontWeight:
-                                                FontWeight.bold,
+                                                FontWeight
+                                                    .bold,
                                           ),
                                         ),
                                       ],
                                     ),
-                                      
 
-                                    const SizedBox(height: 6),
+                                    const SizedBox(
+                                      height: 6,
+                                    ),
 
                                     OutlinedButton.icon(
-                                      onPressed: () => restoreProduct(product),
+                                      onPressed: () =>
+                                          restoreProduct(
+                                        product,
+                                      ),
                                       icon: const Icon(
                                         Icons.restore,
                                       ),

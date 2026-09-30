@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uaap_market/pages/admin/drawer/products/admin_add_product_page.dart';
 import 'package:uaap_market/pages/admin/drawer/products/admin_edit_product_page.dart';
-import 'package:uaap_market/services/admin_products_service.dart';
+import 'package:uaap_market/services/admin/admin_products_service.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 class AdminProductsPage extends StatefulWidget {

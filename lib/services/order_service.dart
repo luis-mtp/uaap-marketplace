@@ -4,7 +4,7 @@ class OrderService {
   final SupabaseClient supabase = Supabase.instance.client;
 
   // Places User's Order in DB
-  Future<String> placeOrder({
+  Future<List<Map<String, dynamic>>> placeOrder({
     required String deliveryAddress,
     required String deliveryCity,
     required String deliveryProvince,
@@ -21,7 +21,7 @@ class OrderService {
     }
 
     final result = await supabase.rpc(
-      'place_order',
+      'place_orders',
       params: {
         'p_delivery_address':
             deliveryAddress,
@@ -38,7 +38,7 @@ class OrderService {
       },
     );
 
-    return result as String;
+    return List<Map<String, dynamic>>.from(result);
   }
 
   // Fetch User's Orders
@@ -50,42 +50,43 @@ class OrderService {
     }
 
     final data = await supabase
-      .from('orders')
-      .select('''
+    .from('orders')
+    .select('''
+      id,
+      seller_id,
+      status,
+      total_amount,
+      created_at,
+      delivery_name,
+      delivery_phone,
+      delivery_address,
+      delivery_city,
+      delivery_province,
+      delivery_postal_code,
+      order_items (
         id,
-        status,
-        total_amount,
-        created_at,
-        delivery_name,
-        delivery_phone,
-        delivery_address,
-        delivery_city,
-        delivery_province,
-        delivery_postal_code,
-        order_items (
+        quantity,
+        unit_price,
+        product_id,
+        variant_id,
+        products (
           id,
-          quantity,
-          unit_price,
-          product_id,
-          variant_id,
-          products (
-            id,
-            name,
-            image_url,
-            team
-          ),
-          product_variants (
-            id,
-            size
-          )
+          name,
+          image_url,
+          team
         ),
-        payments (
-          method,
-          status
+        product_variants (
+          id,
+          size
         )
-      ''')
-      .eq('user_id', user.id)
-      .order('created_at', ascending: false);
+      ),
+      payments (
+        method,
+        status
+      )
+    ''')
+    .eq('user_id', user.id)
+    .order('created_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(data);
   }

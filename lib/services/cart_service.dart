@@ -74,6 +74,7 @@ class CartService {
             price,
             image_url,
             team,
+            stock,
             is_available
           ),
           product_variants (

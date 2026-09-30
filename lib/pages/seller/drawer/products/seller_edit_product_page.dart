@@ -1,38 +1,34 @@
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:uaap_market/services/admin/admin_products_service.dart';
 import 'dart:typed_data';
 
-class AdminAddProductPage extends StatefulWidget {
-  final String? selectedTeam;
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uaap_market/services/seller/seller_product_service.dart';
 
-  const AdminAddProductPage({
+class SellerEditProductPage extends StatefulWidget {
+  final Map<String, dynamic> product;
+
+  const SellerEditProductPage({
     super.key,
-    this.selectedTeam,
+    required this.product,
   });
 
   @override
-  State<AdminAddProductPage> createState() =>
-      _AdminAddProductPageState();
+  State<SellerEditProductPage> createState() =>
+      _SellerEditProductPageState();
 }
 
-class _AdminAddProductPageState extends State<AdminAddProductPage> {
-  final AdminProductService productService = AdminProductService();
+class _SellerEditProductPageState
+    extends State<SellerEditProductPage> {
+  final SellerProductService productService =
+      SellerProductService();
+
   XFile? selectedImage;
   Uint8List? selectedImageBytes;
   String? selectedImageExtension;
 
-  final nameController =
-      TextEditingController();
-
-  final descriptionController =
-      TextEditingController();
-
-  final priceController =
-      TextEditingController();
-
-  final imageController =
-      TextEditingController();
+  final nameController = TextEditingController();
+  final descriptionController = TextEditingController();
+  final priceController = TextEditingController();
 
   final sizeControllers = {
     'S': TextEditingController(),
@@ -43,32 +39,22 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
   };
 
   List<Map<String, dynamic>> categories = [];
+  List<String> approvedTeams = [];
 
   String? selectedCategoryId;
   String? selectedCategoryName;
   String? selectedTeam;
 
+  String? existingImageUrl;
+
   bool isLoading = true;
   bool isSaving = false;
-
-  final List<String> teams = [
-    'AdU',
-    'AdMU',
-    'DLSU',
-    'FEU',
-    'NU',
-    'UE',
-    'UP',
-    'UST',
-  ];
+  bool isAvailable = true;
 
   @override
   void initState() {
     super.initState();
-
-    selectedTeam = widget.selectedTeam;
-
-    loadCategories();
+    loadProductData();
   }
 
   @override
@@ -76,31 +62,106 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
     nameController.dispose();
     descriptionController.dispose();
     priceController.dispose();
-    imageController.dispose();
 
-    for (final controller
-        in sizeControllers.values) {
+    for (final controller in sizeControllers.values) {
       controller.dispose();
     }
 
     super.dispose();
   }
 
-  Future<void> loadCategories() async {
+  Future<void> loadProductData() async {
     try {
-      final data = await productService
-          .supabase
-          .from('categories')
-          .select('id, name')
-          .order('name');
+      final results = await Future.wait([
+        productService.getCategories(),
+        productService.getMyApprovedTeams(),
+      ]);
+
+      final loadedCategories =
+          results[0] as List<Map<String, dynamic>>;
+
+      final loadedTeams =
+          results[1] as List<String>;
+
+      final categoryId =
+          widget.product['category_id']?.toString();
+
+      String? categoryName;
+
+      for (final category in loadedCategories) {
+        if (category['id'].toString() == categoryId) {
+          categoryName =
+              category['name']?.toString();
+          break;
+        }
+      }
+
+      final variants =
+          widget.product['product_variants']
+                  as List<dynamic>? ??
+              [];
+
+      final productTeam =
+          widget.product['team']?.toString();
+
+      // Make sure the current product team remains
+      // selectable even if the application data changes.
+      if (productTeam != null &&
+          !loadedTeams.contains(productTeam)) {
+        loadedTeams.add(productTeam);
+      }
 
       if (!mounted) return;
 
       setState(() {
-        categories =
-            List<Map<String, dynamic>>.from(
-          data,
-        );
+        categories = loadedCategories;
+        approvedTeams = loadedTeams;
+
+        nameController.text =
+            widget.product['name']?.toString() ?? '';
+
+        descriptionController.text =
+            widget.product['description']?.toString() ?? '';
+
+        priceController.text =
+            widget.product['price']?.toString() ?? '';
+
+        selectedTeam = productTeam;
+
+        selectedCategoryId = categoryId;
+        selectedCategoryName = categoryName;
+
+        existingImageUrl =
+            widget.product['image_url']?.toString();
+
+        isAvailable =
+            widget.product['is_available'] ?? true;
+
+        // Load Top product variants.
+        for (final variant in variants) {
+          final size =
+              variant['size']?.toString();
+
+          final stock =
+              variant['stock']?.toString();
+
+          if (size != null &&
+              sizeControllers.containsKey(size)) {
+            sizeControllers[size]!.text =
+                stock ?? '0';
+          }
+        }
+
+        // Load regular product stock.
+        if (variants.isEmpty) {
+          final stock =
+              widget.product['stock'];
+
+          if (stock != null) {
+            sizeControllers['S']!.text =
+                stock.toString();
+          }
+        }
 
         isLoading = false;
       });
@@ -114,7 +175,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to load categories: $e',
+            'Failed to load product: $e',
           ),
         ),
       );
@@ -126,21 +187,23 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
   }
 
   Future<void> saveProduct() async {
-    final name = nameController.text.trim();
+    final name =
+        nameController.text.trim();
 
-    final description = descriptionController.text.trim();
+    final description =
+        descriptionController.text.trim();
 
-    final priceText = priceController.text.trim();
+    final priceText =
+        priceController.text.trim();
 
     if (name.isEmpty ||
-      priceText.isEmpty ||
-      selectedImageBytes == null ||
-      selectedTeam == null ||
-      selectedCategoryId == null) {
+        priceText.isEmpty ||
+        selectedTeam == null ||
+        selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Please fill in all required fields and select an image.',
+            'Please fill in all required fields.',
           ),
         ),
       );
@@ -165,6 +228,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
 
     int? stock;
 
+    // Regular product stock.
     if (!isTopProduct) {
       final stockText =
           sizeControllers['S']!.text.trim();
@@ -196,12 +260,11 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       }
     }
 
+    // Top product stock.
     if (isTopProduct) {
       for (final size in sizeControllers.keys) {
         final value =
-            sizeControllers[size]!
-                .text
-                .trim();
+            sizeControllers[size]!.text.trim();
 
         if (value.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -232,70 +295,64 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       }
     }
 
-    String imageUrl;
-
-    try {
-      imageUrl = await productService.uploadProductImage(
-        imageBytes: selectedImageBytes!,
-        team: selectedTeam!,
-        fileExtension: selectedImageExtension!,
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Image upload failed: $e',
-          ),
-        ),
-      );
-
-      return;
-    }
-
     setState(() {
       isSaving = true;
     });
 
     try {
-      final productId = await productService.addProduct(
+      String imageUrl =
+          existingImageUrl ?? '';
+
+      // Upload a replacement image only
+      // when the seller selected a new image.
+      if (selectedImageBytes != null) {
+        imageUrl =
+            await productService.uploadProductImage(
+          imageBytes: selectedImageBytes!,
+          team: selectedTeam!,
+          fileExtension:
+              selectedImageExtension!,
+        );
+      }
+
+      final productId =
+          widget.product['id'].toString();
+
+      await productService.updateProduct(
+        productId: productId,
         name: name,
         description: description,
         price: price,
         team: selectedTeam!,
         categoryId: selectedCategoryId!,
         imageUrl: imageUrl,
+        isAvailable: isAvailable,
         stock: stock,
       );
 
+      // Update Top product variants.
       if (isTopProduct) {
-        for (final size
-            in sizeControllers.keys) {
-          final sizeStock =
-              int.parse(
-            sizeControllers[size]!
-                .text
-                .trim(),
-          );
+        final sizeStocks = <String, int>{};
 
-          await productService
-              .addProductVariant(
-            productId: productId,
-            size: size,
-            stock: sizeStock,
-          );
+        for (final entry in sizeControllers.entries) {
+          sizeStocks[entry.key] =
+              int.parse(entry.value.text.trim());
         }
-      }
 
-      
+        await productService.syncProductVariants(
+          productId: productId,
+          sizeStocks: sizeStocks,
+        );
+      }  else {
+        await productService.deleteProductVariants(productId);
+      }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Product added successfully.',
+            'Product updated successfully.',
           ),
         ),
       );
@@ -307,7 +364,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to add product: $e',
+            'Failed to update product: $e',
           ),
         ),
       );
@@ -323,7 +380,8 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
   Future<void> pickProductImage() async {
     final picker = ImagePicker();
 
-    final image = await picker.pickImage(
+    final image =
+        await picker.pickImage(
       source: ImageSource.gallery,
     );
 
@@ -331,15 +389,24 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       return;
     }
 
-    final bytes = await image.readAsBytes();
+    final bytes =
+        await image.readAsBytes();
 
     final fileName = image.name;
 
-    final extension = fileName.contains('.')
-        ? fileName.split('.').last.toLowerCase()
-        : '';
+    final extension =
+        fileName.contains('.')
+            ? fileName
+                .split('.')
+                .last
+                .toLowerCase()
+            : '';
 
-    if (!['png', 'jpg', 'jpeg'].contains(extension)) {
+    if (![
+      'png',
+      'jpg',
+      'jpeg',
+    ].contains(extension)) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -360,9 +427,92 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
     });
   }
 
+  Widget _buildProductImage() {
+    // Newly selected image.
+    if (selectedImageBytes != null) {
+      return ClipRRect(
+        borderRadius:
+            BorderRadius.circular(12),
+        child: Image.memory(
+          selectedImageBytes!,
+          width: double.infinity,
+          height: 220,
+          fit: BoxFit.contain,
+        ),
+      );
+    }
+
+    // Existing image.
+    if (existingImageUrl != null &&
+        existingImageUrl!.isNotEmpty) {
+      final imageUrl =
+          existingImageUrl!;
+
+      final isNetworkImage =
+          imageUrl.startsWith('http://') ||
+              imageUrl.startsWith('https://');
+
+      if (isNetworkImage) {
+        return ClipRRect(
+          borderRadius:
+              BorderRadius.circular(12),
+          child: Image.network(
+            imageUrl,
+            width: double.infinity,
+            height: 220,
+            fit: BoxFit.contain,
+            errorBuilder:
+                (context, error, stackTrace) {
+              return _imagePlaceholder();
+            },
+          ),
+        );
+      }
+
+      return ClipRRect(
+        borderRadius:
+            BorderRadius.circular(12),
+        child: Image.asset(
+          imageUrl,
+          width: double.infinity,
+          height: 220,
+          fit: BoxFit.contain,
+          errorBuilder:
+              (context, error, stackTrace) {
+            return _imagePlaceholder();
+          },
+        ),
+      );
+    }
+
+    return _imagePlaceholder();
+  }
+
+  Widget _imagePlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: 220,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Colors.grey,
+        ),
+        borderRadius:
+            BorderRadius.circular(12),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.image_outlined,
+          size: 60,
+          color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
   Widget _buildImagePicker() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
         const Text(
           'Product Image',
@@ -374,46 +524,20 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
 
         const SizedBox(height: 8),
 
-        if (selectedImageBytes != null)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.memory(
-              selectedImageBytes!,
-              width: double.infinity,
-              height: 220,
-              fit: BoxFit.contain,
-            ),
-          )
-        else
-          Container(
-            width: double.infinity,
-            height: 220,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Colors.grey,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.image_outlined,
-                size: 60,
-                color: Colors.grey,
-              ),
-            ),
-          ),
+        _buildProductImage(),
 
         const SizedBox(height: 10),
 
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: pickProductImage,
-            icon: const Icon(Icons.photo_library_outlined),
-            label: Text(
-              selectedImage == null
-                  ? 'Choose Image'
-                  : 'Change Image',
+            onPressed:
+                pickProductImage,
+            icon: const Icon(
+              Icons.photo_library_outlined,
+            ),
+            label: const Text(
+              'Change Image',
             ),
           ),
         ),
@@ -437,11 +561,12 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text(
-            'Add Product',
+            'Edit Product',
           ),
         ),
         body: const Center(
-          child: CircularProgressIndicator(),
+          child:
+              CircularProgressIndicator(),
         ),
       );
     }
@@ -449,12 +574,13 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Add Product',
+          'Edit Product',
         ),
       ),
 
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding:
+            const EdgeInsets.all(16),
 
         child: Column(
           crossAxisAlignment:
@@ -462,9 +588,12 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
 
           children: [
             TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Product Name',
+              controller:
+                  nameController,
+              decoration:
+                  const InputDecoration(
+                labelText:
+                    'Product Name',
                 border:
                     OutlineInputBorder(),
               ),
@@ -476,8 +605,10 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
               controller:
                   descriptionController,
               maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Description',
+              decoration:
+                  const InputDecoration(
+                labelText:
+                    'Description',
                 border:
                     OutlineInputBorder(),
               ),
@@ -486,7 +617,8 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
             const SizedBox(height: 16),
 
             TextField(
-              controller: priceController,
+              controller:
+                  priceController,
               keyboardType:
                   const TextInputType.numberWithOptions(
                 decimal: true,
@@ -503,20 +635,25 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
             const SizedBox(height: 16),
 
             DropdownButtonFormField<String>(
-              value: selectedTeam,
+              initialValue:
+                  selectedTeam,
               decoration:
                   const InputDecoration(
                 labelText: 'Team',
                 border:
                     OutlineInputBorder(),
               ),
-              items: teams.map((team) {
-                return DropdownMenuItem(
-                  value: team,
-                  child: Text(team),
-                );
-              }).toList(),
+              items: approvedTeams.map(
+                (team) {
+                  return DropdownMenuItem<String>(
+                    value: team,
+                    child: Text(team),
+                  );
+                },
+              ).toList(),
               onChanged: (value) {
+                if (value == null) return;
+
                 setState(() {
                   selectedTeam = value;
                 });
@@ -526,29 +663,32 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
             const SizedBox(height: 16),
 
             DropdownButtonFormField<String>(
-              value: selectedCategoryId,
+              initialValue:
+                  selectedCategoryId,
               decoration:
                   const InputDecoration(
                 labelText: 'Category',
                 border:
                     OutlineInputBorder(),
               ),
-              items: categories.map((category) {
-                return DropdownMenuItem<String>(
-                  value: category['id']
-                      .toString(),
-                  child: Text(
-                    category['name']
-                        .toString(),
-                  ),
-                );
-              }).toList(),
+              items: categories.map(
+                (category) {
+                  return DropdownMenuItem<String>(
+                    value:
+                        category['id'].toString(),
+                    child: Text(
+                      category['name'].toString(),
+                    ),
+                  );
+                },
+              ).toList(),
               onChanged: (value) {
+                if (value == null) return;
+
                 final selected =
                     categories.firstWhere(
                   (category) =>
-                      category['id']
-                          .toString() ==
+                      category['id'].toString() ==
                       value,
                 );
 
@@ -557,24 +697,13 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
                       value;
 
                   selectedCategoryName =
-                      selected['name']
-                          .toString();
+                      selected['name'].toString();
                 });
               },
             ),
 
             const SizedBox(height: 16),
 
-            /* TextField(
-              controller: imageController,
-              decoration: const InputDecoration(
-                labelText: 'Image Asset Path',
-                hintText:
-                    'assets/merch/team/dlsu/DLSU_shirt.png',
-                border:
-                    OutlineInputBorder(),
-              ),
-            ), */
             _buildImagePicker(),
 
             const SizedBox(height: 24),
@@ -593,8 +722,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
             const SizedBox(height: 12),
 
             if (isTopProduct)
-              ...sizeControllers.entries
-                  .map(
+              ...sizeControllers.entries.map(
                 (entry) {
                   return Padding(
                     padding:
@@ -633,15 +761,38 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
 
             const SizedBox(height: 16),
 
+            Card(
+              child: SwitchListTile(
+                title: const Text(
+                  'Product Availability',
+                  style: TextStyle(
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  isAvailable
+                      ? 'Product is visible and available'
+                      : 'Product is unavailable',
+                ),
+                value: isAvailable,
+                onChanged: (value) {
+                  setState(() {
+                    isAvailable = value;
+                  });
+                },
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             SizedBox(
               width: double.infinity,
-
               child: ElevatedButton(
                 onPressed:
                     isSaving
                         ? null
                         : saveProduct,
-
                 child: isSaving
                     ? const SizedBox(
                         width: 20,
@@ -652,7 +803,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
                         ),
                       )
                     : const Text(
-                        'Add Product',
+                        'Save Changes',
                       ),
               ),
             ),

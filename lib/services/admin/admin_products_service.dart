@@ -241,4 +241,63 @@ class AdminProductService {
 
     return List<Map<String, dynamic>>.from(data);
   }
+
+  // Convert Top to Non-Top Product
+  Future<void> deleteProductVariants(
+    String productId,
+  ) async {
+    await supabase
+        .from('product_variants')
+        .delete()
+        .eq('product_id', productId);
+  }
+
+  // Synchoronize Product and Stocks
+  Future<void> syncProductVariants({
+    required String productId,
+    required Map<String, int> sizeStocks,
+  }) async {
+    final existingData = await supabase
+        .from('product_variants')
+        .select('id, size')
+        .eq('product_id', productId);
+
+    final existingVariants =
+        List<Map<String, dynamic>>.from(existingData);
+
+    final existingBySize = <String, String>{};
+
+    for (final variant in existingVariants) {
+      final id = variant['id']?.toString();
+      final size = variant['size']?.toString();
+
+      if (id != null && size != null) {
+        existingBySize[size] = id;
+      }
+    }
+
+    for (final entry in sizeStocks.entries) {
+      final size = entry.key;
+      final stock = entry.value;
+
+      if (existingBySize.containsKey(size)) {
+        await supabase
+            .from('product_variants')
+            .update({
+              'stock': stock,
+              'is_available': stock > 0,
+            })
+            .eq('id', existingBySize[size]!);
+      } else {
+        await supabase
+            .from('product_variants')
+            .insert({
+              'product_id': productId,
+              'size': size,
+              'stock': stock,
+              'is_available': stock > 0,
+            });
+      }
+    }
+  }
 }

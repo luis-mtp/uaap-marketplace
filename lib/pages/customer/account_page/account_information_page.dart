@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uaap_market/pages/customer/account_page/change_password_page.dart';
+import 'package:uaap_market/pages/customer/account_page/seller_application_page.dart';
 import 'package:uaap_market/services/auth_services.dart';
 
 class AccountInformationPage extends StatefulWidget {
@@ -255,6 +256,45 @@ class _AccountInformationPageState
                   MaterialPageRoute(
                     builder: (context) =>
                         const ChangePasswordPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+
+            const Divider(),
+
+            const SizedBox(height: 16),
+
+            const Text(
+              'Seller',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            ListTile(
+              leading: const Icon(
+                Icons.store_outlined,
+              ),
+              title: const Text(
+                'Apply to be a Seller',
+              ),
+              subtitle: const Text(
+                'Apply to sell UAAP merchandise',
+              ),
+              trailing: const Icon(
+                Icons.chevron_right,
+              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const SellerApplicationPage(),
                   ),
                 );
               },

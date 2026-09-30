@@ -481,19 +481,25 @@ class _CustomerCartPageState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: cartItems.isEmpty ? null : () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                               CheckoutAddressPage(
-                                subtotal: cartTotal,
-                                deliveryFee: deliveryFee,
-                                total: orderTotal,
-                              ),
-                        ),
-                      );
-                    },
+                  onPressed: cartItems.isEmpty
+                    ? null
+                    : () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                CheckoutAddressPage(
+                                  subtotal: cartTotal,
+                                  deliveryFee: deliveryFee,
+                                  total: orderTotal,
+                                ),
+                          ),
+                        );
+
+                        if (!mounted) return;
+
+                        await loadCart();
+                      },
                   child: const Text(
                     'Proceed to Checkout',
                   ),

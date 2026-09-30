@@ -42,7 +42,7 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
     });
 
     try {
-      final orderId =
+      final orders =
           await orderService.placeOrder(
         deliveryAddress:
             address['full_address'] ?? '',
@@ -58,6 +58,14 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
 
       if (!mounted) return;
 
+      final orderIds = orders
+          .map(
+            (order) =>
+                order['order_id']?.toString() ?? '',
+          )
+          .where((id) => id.isNotEmpty)
+          .toList();
+
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -66,9 +74,45 @@ class _OrderConfirmationPageState extends State<OrderConfirmationPage> {
             title: const Text(
               'Order Placed',
             ),
-            content: Text(
-              'Your order has been placed successfully.\n\n'
-              'Order ID:\n$orderId',
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Your order has been placed successfully.',
+                ),
+
+                const SizedBox(height: 16),
+
+                const Text(
+                  'Order ID(s):',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                ...orderIds.map(
+                  (id) {
+                    final shortId =
+                        id.length >= 8
+                            ? id.substring(0, 8)
+                            : id;
+
+                    return Padding(
+                      padding:
+                          const EdgeInsets.only(
+                        bottom: 4,
+                      ),
+                      child: Text(
+                        '#$shortId',
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             actions: [
               ElevatedButton(

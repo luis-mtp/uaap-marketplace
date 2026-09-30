@@ -1,34 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:uaap_market/services/admin_service.dart';
+import 'package:uaap_market/services/admin/admin_service.dart';
 
-class AdminCustomersPage extends StatefulWidget {
-  const AdminCustomersPage({super.key});
+class AdminUsersPage extends StatefulWidget {
+  const AdminUsersPage({super.key});
 
   @override
-  State<AdminCustomersPage> createState() => _AdminCustomersPageState();
+  State<AdminUsersPage> createState() => _AdminUsersPageState();
 }
 
-class _AdminCustomersPageState extends State<AdminCustomersPage> {
+class _AdminUsersPageState extends State<AdminUsersPage> {
   final AdminService adminService = AdminService();
 
-  List<Map<String, dynamic>> customers = [];
+  List<Map<String, dynamic>> users = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    loadCustomers();
+    loadUsers();
   }
 
-  Future<void> loadCustomers() async {
+  Future<void> loadUsers() async {
     try {
       final data =
-          await adminService.getAllCustomers();
+          await adminService.getAllUsers();
 
       if (!mounted) return;
 
       setState(() {
-        customers = data;
+        users = data;
         isLoading = false;
       });
     } catch (e) {
@@ -41,28 +41,28 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to load customers: $e',
+            'Failed to load users: $e',
           ),
         ),
       );
     }
   }
 
-  Future<void> changeCustomerStatus(
-    Map<String, dynamic> customer,
+  Future<void> changeUserStatus(
+    Map<String, dynamic> user,
   ) async {
     final bool currentStatus =
-        customer['is_active'] ?? true;
+        user['is_active'] ?? true;
 
     final bool newStatus = !currentStatus;
 
     try {
-      await adminService.setCustomerActiveStatus(
-        userId: customer['id'].toString(),
+      await adminService.setUserActiveStatus(
+        userId: user['id'].toString(),
         isActive: newStatus,
       );
 
-      await loadCustomers();
+      await loadUsers();
 
       if (!mounted) return;
 
@@ -70,8 +70,8 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
         SnackBar(
           content: Text(
             newStatus
-                ? 'Customer account restored.'
-                : 'Customer account disabled.',
+                ? 'User account restored.'
+                : 'User account disabled.',
           ),
         ),
       );
@@ -81,7 +81,7 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to update customer: $e',
+            'Failed to update user: $e',
           ),
         ),
       );
@@ -104,41 +104,46 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Customers'),
+        title: const Text('Users'),
       ),
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(),
             )
-          : customers.isEmpty
+          : users.isEmpty
               ? const Center(
                   child: Text(
-                    'No customers found.',
+                    'No users found.',
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: loadCustomers,
+                  onRefresh: loadUsers,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(12),
-                    itemCount: customers.length,
+                    itemCount: users.length,
                     itemBuilder: (context, index) {
-                      final customer =
-                          customers[index];
+                      final user =
+                          users[index];
 
                       final String name =
-                          customer['full_name'] ??
+                          user['full_name'] ??
                               'No name';
 
+                      final String role =
+                          user['role'] == 'seller'
+                              ? 'Seller'
+                              : 'Customer';
+
                       final String email =
-                          customer['email'] ??
+                          user['email'] ??
                               'No email';
 
                       final String phone =
-                          customer['phone'] ??
+                          user['phone'] ??
                               'No phone number';
 
                       final bool isActive =
-                          customer['is_active'] ??
+                          user['is_active'] ??
                               true;
 
                       return Card(
@@ -165,15 +170,28 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
                                     width: 12,
                                   ),
                                   Expanded(
-                                    child: Text(
-                                      name,
-                                      style:
-                                          const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight:
-                                            FontWeight
-                                                .bold,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          role,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: role == 'Seller'
+                                                ? Colors.blue
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   Text(
@@ -214,7 +232,7 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
                               ),
 
                               Text(
-                                'Joined: ${formatDate(customer['created_at']?.toString())}',
+                                'Joined: ${formatDate(user['created_at']?.toString())}',
                               ),
 
                               const SizedBox(
@@ -227,8 +245,8 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
                                 child:
                                     OutlinedButton.icon(
                                   onPressed: () =>
-                                      changeCustomerStatus(
-                                    customer,
+                                      changeUserStatus(
+                                    user,
                                   ),
                                   icon: Icon(
                                     isActive

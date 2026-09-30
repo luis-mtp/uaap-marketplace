@@ -1,38 +1,34 @@
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:uaap_market/services/admin/admin_products_service.dart';
 import 'dart:typed_data';
 
-class AdminAddProductPage extends StatefulWidget {
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uaap_market/services/seller/seller_product_service.dart';
+
+class SellerAddProductPage extends StatefulWidget {
   final String? selectedTeam;
 
-  const AdminAddProductPage({
+  const SellerAddProductPage({
     super.key,
     this.selectedTeam,
   });
 
   @override
-  State<AdminAddProductPage> createState() =>
-      _AdminAddProductPageState();
+  State<SellerAddProductPage> createState() =>
+      _SellerAddProductPageState();
 }
 
-class _AdminAddProductPageState extends State<AdminAddProductPage> {
-  final AdminProductService productService = AdminProductService();
+class _SellerAddProductPageState
+    extends State<SellerAddProductPage> {
+  final SellerProductService productService =
+      SellerProductService();
+
   XFile? selectedImage;
   Uint8List? selectedImageBytes;
   String? selectedImageExtension;
 
-  final nameController =
-      TextEditingController();
-
-  final descriptionController =
-      TextEditingController();
-
-  final priceController =
-      TextEditingController();
-
-  final imageController =
-      TextEditingController();
+  final nameController = TextEditingController();
+  final descriptionController = TextEditingController();
+  final priceController = TextEditingController();
 
   final sizeControllers = {
     'S': TextEditingController(),
@@ -43,6 +39,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
   };
 
   List<Map<String, dynamic>> categories = [];
+  List<String> approvedTeams = [];
 
   String? selectedCategoryId;
   String? selectedCategoryName;
@@ -51,24 +48,13 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
   bool isLoading = true;
   bool isSaving = false;
 
-  final List<String> teams = [
-    'AdU',
-    'AdMU',
-    'DLSU',
-    'FEU',
-    'NU',
-    'UE',
-    'UP',
-    'UST',
-  ];
-
   @override
   void initState() {
     super.initState();
 
     selectedTeam = widget.selectedTeam;
 
-    loadCategories();
+    loadData();
   }
 
   @override
@@ -76,31 +62,39 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
     nameController.dispose();
     descriptionController.dispose();
     priceController.dispose();
-    imageController.dispose();
 
-    for (final controller
-        in sizeControllers.values) {
+    for (final controller in sizeControllers.values) {
       controller.dispose();
     }
 
     super.dispose();
   }
 
-  Future<void> loadCategories() async {
+  Future<void> loadData() async {
     try {
-      final data = await productService
-          .supabase
-          .from('categories')
-          .select('id, name')
-          .order('name');
+      final results = await Future.wait([
+        productService.getCategories(),
+        productService.getMyApprovedTeams(),
+      ]);
+
+      final loadedCategories =
+          results[0] as List<Map<String, dynamic>>;
+
+      final loadedTeams =
+          results[1] as List<String>;
 
       if (!mounted) return;
 
       setState(() {
-        categories =
-            List<Map<String, dynamic>>.from(
-          data,
-        );
+        categories = loadedCategories;
+        approvedTeams = loadedTeams;
+
+        // If the selected team was passed in but is not approved,
+        // don't allow it to remain selected.
+        if (selectedTeam != null &&
+            !approvedTeams.contains(selectedTeam)) {
+          selectedTeam = null;
+        }
 
         isLoading = false;
       });
@@ -114,7 +108,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to load categories: $e',
+            'Failed to load product data: $e',
           ),
         ),
       );
@@ -127,16 +121,15 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
 
   Future<void> saveProduct() async {
     final name = nameController.text.trim();
-
-    final description = descriptionController.text.trim();
-
+    final description =
+        descriptionController.text.trim();
     final priceText = priceController.text.trim();
 
     if (name.isEmpty ||
-      priceText.isEmpty ||
-      selectedImageBytes == null ||
-      selectedTeam == null ||
-      selectedCategoryId == null) {
+        priceText.isEmpty ||
+        selectedImageBytes == null ||
+        selectedTeam == null ||
+        selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -148,8 +141,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       return;
     }
 
-    final price =
-        double.tryParse(priceText);
+    final price = double.tryParse(priceText);
 
     if (price == null || price < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -165,6 +157,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
 
     int? stock;
 
+    // Non-Top products use normal stock.
     if (!isTopProduct) {
       final stockText =
           sizeControllers['S']!.text.trim();
@@ -196,12 +189,11 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       }
     }
 
+    // Top products use size variants.
     if (isTopProduct) {
       for (final size in sizeControllers.keys) {
         final value =
-            sizeControllers[size]!
-                .text
-                .trim();
+            sizeControllers[size]!.text.trim();
 
         if (value.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -215,8 +207,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
           return;
         }
 
-        final parsed =
-            int.tryParse(value);
+        final parsed = int.tryParse(value);
 
         if (parsed == null || parsed < 0) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -232,34 +223,22 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
       }
     }
 
-    String imageUrl;
-
-    try {
-      imageUrl = await productService.uploadProductImage(
-        imageBytes: selectedImageBytes!,
-        team: selectedTeam!,
-        fileExtension: selectedImageExtension!,
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Image upload failed: $e',
-          ),
-        ),
-      );
-
-      return;
-    }
-
     setState(() {
       isSaving = true;
     });
 
     try {
-      final productId = await productService.addProduct(
+      // Upload image first.
+      final imageUrl =
+          await productService.uploadProductImage(
+        imageBytes: selectedImageBytes!,
+        team: selectedTeam!,
+        fileExtension: selectedImageExtension!,
+      );
+
+      // Create the product.
+      final productId =
+          await productService.addProductAndGetId(
         name: name,
         description: description,
         price: price,
@@ -269,26 +248,21 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
         stock: stock,
       );
 
+      // Create variants for Top products.
       if (isTopProduct) {
-        for (final size
-            in sizeControllers.keys) {
-          final sizeStock =
-              int.parse(
-            sizeControllers[size]!
-                .text
-                .trim(),
-          );
+        final Map<String, int> sizeStocks = {};
 
-          await productService
-              .addProductVariant(
-            productId: productId,
-            size: size,
-            stock: sizeStock,
+        for (final size in sizeControllers.keys) {
+          sizeStocks[size] = int.parse(
+            sizeControllers[size]!.text.trim(),
           );
         }
-      }
 
-      
+        await productService.addProductVariants(
+          productId: productId,
+          sizeStocks: sizeStocks,
+        );
+      }
 
       if (!mounted) return;
 
@@ -311,13 +285,13 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
           ),
         ),
       );
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        isSaving = false;
+      });
     }
-
-    if (!mounted) return;
-
-    setState(() {
-      isSaving = false;
-    });
   }
 
   Future<void> pickProductImage() async {
@@ -408,8 +382,12 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: pickProductImage,
-            icon: const Icon(Icons.photo_library_outlined),
+            onPressed: isSaving
+                ? null
+                : pickProductImage,
+            icon: const Icon(
+              Icons.photo_library_outlined,
+            ),
             label: Text(
               selectedImage == null
                   ? 'Choose Image'
@@ -436,9 +414,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
     if (isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'Add Product',
-          ),
+          title: const Text('Add Product'),
         ),
         body: const Center(
           child: CircularProgressIndicator(),
@@ -448,9 +424,7 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Add Product',
-        ),
+        title: const Text('Add Product'),
       ),
 
       body: SingleChildScrollView(
@@ -465,21 +439,18 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
               controller: nameController,
               decoration: const InputDecoration(
                 labelText: 'Product Name',
-                border:
-                    OutlineInputBorder(),
+                border: OutlineInputBorder(),
               ),
             ),
 
             const SizedBox(height: 16),
 
             TextField(
-              controller:
-                  descriptionController,
+              controller: descriptionController,
               maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Description',
-                border:
-                    OutlineInputBorder(),
+                border: OutlineInputBorder(),
               ),
             ),
 
@@ -491,90 +462,82 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
                   const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration:
-                  const InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Price',
                 prefixText: '₱ ',
-                border:
-                    OutlineInputBorder(),
+                border: OutlineInputBorder(),
               ),
             ),
 
             const SizedBox(height: 16),
 
             DropdownButtonFormField<String>(
-              value: selectedTeam,
-              decoration:
-                  const InputDecoration(
+              initialValue: selectedTeam,
+              decoration: const InputDecoration(
                 labelText: 'Team',
-                border:
-                    OutlineInputBorder(),
+                border: OutlineInputBorder(),
               ),
-              items: teams.map((team) {
-                return DropdownMenuItem(
+              items: approvedTeams.map((team) {
+                return DropdownMenuItem<String>(
                   value: team,
                   child: Text(team),
                 );
               }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedTeam = value;
-                });
-              },
+              onChanged: isSaving
+                  ? null
+                  : (value) {
+                      setState(() {
+                        selectedTeam = value;
+                      });
+                    },
             ),
+
+            const SizedBox(height: 8),
+
+            if (approvedTeams.isEmpty)
+              const Text(
+                'You do not have any approved teams yet.',
+                style: TextStyle(
+                  color: Colors.red,
+                ),
+              ),
 
             const SizedBox(height: 16),
 
             DropdownButtonFormField<String>(
-              value: selectedCategoryId,
-              decoration:
-                  const InputDecoration(
+              initialValue: selectedCategoryId,
+              decoration: const InputDecoration(
                 labelText: 'Category',
-                border:
-                    OutlineInputBorder(),
+                border: OutlineInputBorder(),
               ),
               items: categories.map((category) {
                 return DropdownMenuItem<String>(
-                  value: category['id']
-                      .toString(),
+                  value: category['id'].toString(),
                   child: Text(
-                    category['name']
-                        .toString(),
+                    category['name'].toString(),
                   ),
                 );
               }).toList(),
-              onChanged: (value) {
-                final selected =
-                    categories.firstWhere(
-                  (category) =>
-                      category['id']
-                          .toString() ==
-                      value,
-                );
+              onChanged: isSaving
+                  ? null
+                  : (value) {
+                      final selected =
+                          categories.firstWhere(
+                        (category) =>
+                            category['id'].toString() ==
+                            value,
+                      );
 
-                setState(() {
-                  selectedCategoryId =
-                      value;
-
-                  selectedCategoryName =
-                      selected['name']
-                          .toString();
-                });
-              },
+                      setState(() {
+                        selectedCategoryId = value;
+                        selectedCategoryName =
+                            selected['name'].toString();
+                      });
+                    },
             ),
 
             const SizedBox(height: 16),
 
-            /* TextField(
-              controller: imageController,
-              decoration: const InputDecoration(
-                labelText: 'Image Asset Path',
-                hintText:
-                    'assets/merch/team/dlsu/DLSU_shirt.png',
-                border:
-                    OutlineInputBorder(),
-              ),
-            ), */
             _buildImagePicker(),
 
             const SizedBox(height: 24),
@@ -585,16 +548,14 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
                   .textTheme
                   .titleMedium
                   ?.copyWith(
-                    fontWeight:
-                        FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                   ),
             ),
 
             const SizedBox(height: 12),
 
             if (isTopProduct)
-              ...sizeControllers.entries
-                  .map(
+              ...sizeControllers.entries.map(
                 (entry) {
                   return Padding(
                     padding:
@@ -602,12 +563,10 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
                       bottom: 12,
                     ),
                     child: TextField(
-                      controller:
-                          entry.value,
+                      controller: entry.value,
                       keyboardType:
                           TextInputType.number,
-                      decoration:
-                          InputDecoration(
+                      decoration: InputDecoration(
                         labelText:
                             '${entry.key} Stock',
                         border:
@@ -619,15 +578,12 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
               )
             else
               TextField(
-                controller:
-                    sizeControllers['S'],
+                controller: sizeControllers['S'],
                 keyboardType:
                     TextInputType.number,
-                decoration:
-                    const InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Stock',
-                  border:
-                      OutlineInputBorder(),
+                  border: OutlineInputBorder(),
                 ),
               ),
 
@@ -635,10 +591,10 @@ class _AdminAddProductPageState extends State<AdminAddProductPage> {
 
             SizedBox(
               width: double.infinity,
-
               child: ElevatedButton(
                 onPressed:
-                    isSaving
+                    isSaving ||
+                            approvedTeams.isEmpty
                         ? null
                         : saveProduct,
 
